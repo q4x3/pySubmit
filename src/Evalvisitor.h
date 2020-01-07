@@ -9,7 +9,29 @@
 #include <iomanip>
 #include <vector>
 
-std::map<std::string,antlrcpp::Any>tel;
+
+std::vector<std::map<std::string,antlrcpp::Any>>var;
+
+//返回以str为名的any
+antlrcpp::Any tel(std::string str)
+{
+    for (int i = 0;i < var.size();++ i) {
+        if (var[i].count(str)) return var[i][str];
+    }
+}
+
+//修改以str为名的any的值
+void chan(std::string str, antlrcpp::Any a)
+{
+    for (int i = 0;i < var.size();++ i) {
+        if (var[i].count(str)) {
+            var[i][str] = a;
+            return;
+        }
+    }
+    var[var.size()-1][str] = a;
+    return;
+}
 
 //print函数
 void anyPrint(antlrcpp::Any tmp)
@@ -26,25 +48,25 @@ void anyPrint(antlrcpp::Any tmp)
             return;
         }
         else {
-            if (tel[str2].is<std::string>()) {
-                if (tel[str2].as<std::string>()[0] == '"') {
-                    std::cout << std::string(tel[str2].as<std::string>(),1,tel[str2].as<std::string>().length()-2);
+            if (tel(str2).is<std::string>()) {
+                if (tel(str2).as<std::string>()[0] == '"') {
+                    std::cout << std::string(tel(str2).as<std::string>(),1,tel(str2).as<std::string>().length()-2);
                     return;
                 }
-                if (tel[str2].as<std::string>() == "None") {
+                if (tel(str2).as<std::string>() == "None") {
                     std::cout << "None";
                     return;
                 }
             }
-            if (tel[str2].is<bigInteger>()) {
-                std::cout << tel[str2].as<bigInteger>();
+            if (tel(str2).is<bigInteger>()) {
+                std::cout << tel(str2).as<bigInteger>();
                 return;
             }
-            if (tel[str2].is<bool>())
-                if (tel[str2].as<bool>()) {std::cout << "True"; return;}
+            if (tel(str2).is<bool>())
+                if (tel(str2).as<bool>()) {std::cout << "True"; return;}
                 else {std::cout << "False"; return;}
-            if (tel[str2].is<double>()) {
-                std::cout << fixed << setprecision(6) << tel[str2].as<double>();
+            if (tel(str2).is<double>()) {
+                std::cout << fixed << setprecision(6) << tel(str2).as<double>();
                 return;
             }
         }
@@ -79,7 +101,7 @@ bool transbool(antlrcpp::Any tmp)
         if (str1 == "None") tmpbl = false;
         if (str1[0] == '"') tmpbl = str1.length()-2;
         if (str1[0] != '"') {
-            antlrcpp::Any tmp2 = tel[str1];
+            antlrcpp::Any tmp2 = tel(str1);
             if (tmp2.is<bool>()) tmpbl = tmp2.as<bool>();
             if (tmp2.is<bigInteger>()) tmpbl = tmp2.as<bigInteger>();
             if (tmp2.is<double>()) tmpbl = tmp2.as<double>();
@@ -105,7 +127,7 @@ bigInteger transint(antlrcpp::Any tmp)
         std::string str = tmp.as<std::string>();
         if (str == "None") in = 0;
         else {
-            antlrcpp::Any tmp0 = tel[str];
+            antlrcpp::Any tmp0 = tel(str);
             if (tmp0.is<bigInteger>()) in = tmp0.as<bigInteger>();
             if (tmp0.is<bool>()) {
                 if(tmp0.as<bool>()) in = 1;
@@ -127,7 +149,7 @@ double transflo(antlrcpp::Any tmp)
         std::string str = tmp.as<std::string>();
         if (str == "None") dou = 0;
         else {
-            antlrcpp::Any tmp0 = tel[str];
+            antlrcpp::Any tmp0 = tel(str);
             if (tmp0.is<double>()) dou = tmp0.as<double>();
             if (tmp0.is<bigInteger>()) dou = (double)tmp0.as<bigInteger>();
             if (tmp0.is<bool>()) dou = (double)tmp0.as<bool>();
@@ -142,7 +164,7 @@ std::string transstr(antlrcpp::Any tmp)
     if (tmp.is<std::string>()) {
         str = tmp.as<std::string>();
         if (str[0] != '"') {
-            antlrcpp::Any tmp0 = tel[str];
+            antlrcpp::Any tmp0 = tel(str);
             if (tmp0.is<std::string>()) str = tmp0.as<std::string>();
             if (tmp0.is<bigInteger>()) str = '"' + (std::string)tmp0.as<bigInteger>() + '"';
             if (tmp0.is<double>()) str = '"' + std::to_string(tmp0.as<double>()) + '"';
@@ -164,8 +186,11 @@ std::string transstr(antlrcpp::Any tmp)
 class EvalVisitor: public Python3BaseVisitor {
     antlrcpp::Any visitFile_input(Python3Parser::File_inputContext *ctx) override {
         //std::cout << "fileinput" << std::endl;
+        std::map<std::string, antlrcpp::Any> glo;
+        var.push_back(glo);
         for (int i = 0;i < ctx->stmt().size();++ i)
             visit(ctx->stmt(i));
+        var.pop_back();
         return 0;
     }
 
@@ -213,7 +238,7 @@ class EvalVisitor: public Python3BaseVisitor {
                 for (int i = 0;i < atm0.size();++ i) {
                     if (atm0[i].is<std::string>()) {
                         std::string tmp = atm0[i].as<std::string>();
-                        if (tmp[0] != '"') atm0[i] = tel[tmp];
+                        if (tmp[0] != '"') atm0[i] = tel(tmp);
                     }
                 }
                 
@@ -222,7 +247,7 @@ class EvalVisitor: public Python3BaseVisitor {
                     for (int j = 0;j < atm.size();++ j) {
                         std::string atms;
                         if (atm[j].is<std::string>()) atms = atm[j].as<std::string>();
-                        tel[atms] = atm0[j];
+                        chan(atms, atm0[j]);
                     }
                     
                 }
@@ -242,162 +267,163 @@ class EvalVisitor: public Python3BaseVisitor {
                 tmpstr = tmp.as<std::string>();
                 if (tmpstr[0] == '"') sig = 2;
                 else {
-                    if (tel[tmpstr].is<bigInteger>()) {tmpint = tel[tmpstr].as<bigInteger>(); sig = 0;}
-                    if (tel[tmpstr].is<double>()) {tmpdou = tel[tmpstr].as<double>(); sig = 1;}
-                    if (tel[tmpstr].is<std::string>()) {tmpstr = tel[tmpstr].as<std::string>(); sig = 2;}
+                    if (tel(tmpstr).is<bigInteger>()) {tmpint = tel(tmpstr).as<bigInteger>(); sig = 0;}
+                    if (tel(tmpstr).is<double>()) {tmpdou = tel(tmpstr).as<double>(); sig = 1;}
+                    if (tel(tmpstr).is<std::string>()) {tmpstr = tel(tmpstr).as<std::string>(); sig = 2;}
                 }
             }
             if (sig == 0) {
-                if (tel[tmpL].is<bigInteger>()) {
-                    bigInteger tmpin = tel[tmpL].as<bigInteger>();
+                if (tel(tmpL).is<bigInteger>()) {
+                    bigInteger tmpin = tel(tmpL).as<bigInteger>();
                     if (ctx->augassign()->ADD_ASSIGN()) {
                         tmpint = tmpint + tmpin;
-                        tel[tmpL] = tmpint;
+                        chan(tmpL, tmpint);
                         return tmpint;
                     }
                     if (ctx->augassign()->SUB_ASSIGN()) {
                         tmpint = tmpin - tmpint;
-                        tel[tmpL] = tmpint;
+                        chan(tmpL, tmpint);
                         return tmpint;
                     }
                     if (ctx->augassign()->MULT_ASSIGN()) {
                         tmpint = tmpint * tmpin;
-                        tel[tmpL] = tmpint;
+                        chan(tmpL, tmpint);
                         return tmpint;
                     }
                     if (ctx->augassign()->DIV_ASSIGN()) {
                         tmpdou = (double)tmpin / (double)tmpint;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->IDIV_ASSIGN()) {
                         tmpint = tmpin / tmpint;
-                        tel[tmpL] = tmpint;
+                        chan(tmpL, tmpint);
                         return tmpint;
                     }
                     if (ctx->augassign()->MOD_ASSIGN()) {
                         tmpint = tmpin % tmpint;
-                        tel[tmpL] = tmpint;
+                        chan(tmpL, tmpint);
                         return tmpint;
                     }
                 }
-                if (tel[tmpL].is<double>()) {
-                    double tmpdo = tel[tmpL].as<double>();
+                if (tel(tmpL).is<double>()) {
+                    double tmpdo = tel(tmpL).as<double>();
                     if (ctx->augassign()->ADD_ASSIGN()) {
                         tmpdou = (double)tmpint + tmpdo;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->SUB_ASSIGN()) {
                         tmpdou = tmpdo - (double)tmpint;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->MULT_ASSIGN()) {
                         tmpdou = (double)tmpint * tmpdo;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->DIV_ASSIGN()) {
                         tmpdou = tmpdo / (double)tmpint;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->IDIV_ASSIGN()) {
                         tmpint = (long long int)tmpdo / (int)tmpint;
-                        tel[tmpL] = tmpint;
+                        chan(tmpL, tmpint);
                         return tmpint;
                     }
                     if (ctx->augassign()->MOD_ASSIGN()) {
                         tmpint = (long long int)tmpdo % (long long int)tmpint;
-                        tel[tmpL] = tmpint;
+                        chan(tmpL, tmpint);
                         return tmpint;
                     }
                 }
-                if (tel[tmpL].is<std::string>()) {
-                    tmpstr = tel[tmpL].as<std::string>();
+                if (tel(tmpL).is<std::string>()) {
+                    tmpstr = tel(tmpL).as<std::string>();
                     tmpstr = std::string(tmpstr, 1, tmpstr.length()-2);
                     std::string str;
                     for (int i = 1;i <= (int)tmpint;++ i) {
                         str += tmpstr;
                     }
-                    tel[tmpL] = '"' + str + '"';
+                    chan(tmpL, '"' + str + '"');
                     return '"' + str + '"';
                 }
             }
             if (sig == 1) {
-                if (tel[tmpL].is<bigInteger>()) {
-                    bigInteger tmpin = tel[tmpL].as<bigInteger>();
+                if (tel(tmpL).is<bigInteger>()) {
+                    bigInteger tmpin = tel(tmpL).as<bigInteger>();
                     if (ctx->augassign()->ADD_ASSIGN()) {
                         tmpdou = tmpdou + (double)tmpin;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->SUB_ASSIGN()) {
                         tmpdou = (double)tmpin - tmpdou;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->MULT_ASSIGN()) {
                         tmpdou = (double)tmpin * tmpdou;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->DIV_ASSIGN()) {
                         tmpdou = (double)tmpin / tmpdou;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->IDIV_ASSIGN()) {
                         tmpdou = (int)tmpin / (int)tmpdou;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->MOD_ASSIGN()) {
                         tmpdou = (long long int)tmpin % (long long int)tmpdou;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                 }
-                if (tel[tmpL].is<double>()) {
-                    double tmpdo = tel[tmpL].as<double>();
+                if (tel(tmpL).is<double>()) {
+                    double tmpdo = tel(tmpL).as<double>();
                     if (ctx->augassign()->ADD_ASSIGN()) {
                         tmpdou = tmpdou + tmpdo;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->SUB_ASSIGN()) {
                         tmpdou = tmpdo - tmpdou;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->MULT_ASSIGN()) {
                         tmpdou = tmpdo * tmpdou;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->DIV_ASSIGN()) {
                         tmpdou = tmpdo / tmpdou;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->IDIV_ASSIGN()) {
                         tmpdou = (long long int)tmpdo / (long long int)tmpdou;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                     if (ctx->augassign()->MOD_ASSIGN()) {
                         tmpdou = (long long int)tmpdo % (long long int)tmpdou;
-                        tel[tmpL] = tmpdou;
+                        chan(tmpL, tmpdou);
                         return tmpdou;
                     }
                 }
             }
             if (sig == 2) {
-                std::string tmps = tel[tmpL].as<std::string>();
+                std::string tmps = tel(tmpL).as<std::string>();
                 tmpstr = std::string(tmpstr, 1, tmpstr.length() - 2);
                 tmps = std::string(tmps, 1, tmps.length() - 2);
-                tel[tmpL] = '"' + tmps + tmpstr + '"';
+                tel(tmpL) = '"' + tmps + tmpstr + '"';
+                chan(tmpL, '"' + tmps + tmpstr + '"');
                 return '"' + tmps + tmpstr + '"';
             }
         }
@@ -535,17 +561,17 @@ class EvalVisitor: public Python3BaseVisitor {
                     lhsstr = lhs.as<std::string>();
                     if (lhsstr[0] == '"') lsig = 0;
                     else {
-                        if (tel[lhsstr].is<std::string>()) {
+                        if (tel(lhsstr).is<std::string>()) {
                             lsig = 1;
-                            lhsstr = tel[lhsstr].as<std::string>();
+                            lhsstr = tel(lhsstr).as<std::string>();
                         } 
-                        if (tel[lhsstr].is<bigInteger>()) {
+                        else if (tel(lhsstr).is<bigInteger>()) {
                             lsig = 3;
-                            lhsint = tel[lhsstr].as<bigInteger>();
+                            lhsint = tel(lhsstr).as<bigInteger>();
                         }
-                        if (tel[lhsstr].is<double>()) {
+                        else if (tel(lhsstr).is<double>()) {
                             lsig = 5;
-                            lhsdou = tel[lhsstr].as<double>();
+                            lhsdou = tel(lhsstr).as<double>();
                         }
                     }
                 } 
@@ -553,21 +579,22 @@ class EvalVisitor: public Python3BaseVisitor {
                     lsig = 2;
                     lhsint = lhs.as<bigInteger>();
                 }
+                
                 if (rhs.is<std::string>()) {
                     rhsstr = rhs.as<std::string>();
                     if (rhsstr[0] == '"') rsig = 0;
                     else {
-                        if (tel[rhsstr].is<std::string>()) {
+                        if (tel(rhsstr).is<std::string>()) {
                             rsig = 1;
-                            rhsstr = tel[rhsstr].as<std::string>();
+                            rhsstr = tel(rhsstr).as<std::string>();
                         } 
-                        if (tel[rhsstr].is<bigInteger>()) {
+                        else if (tel(rhsstr).is<bigInteger>()) {
                             rsig = 3;
-                            rhsint = tel[rhsstr].as<bigInteger>();
+                            rhsint = tel(rhsstr).as<bigInteger>();
                         }
-                        if (tel[rhsstr].is<double>()) {
+                        else if (tel(rhsstr).is<double>()) {
                             rsig = 5;
-                            rhsdou = tel[rhsstr].as<double>();
+                            rhsdou = tel(rhsstr).as<double>();
                         }
                     }
                 } 
@@ -648,8 +675,8 @@ class EvalVisitor: public Python3BaseVisitor {
                     std::string tmpstr = tmp.as<std::string>();
                     if (tmpstr[0] == '"') {con = 2; break;}
                     if (tmpstr[0] != '"' && tmpstr != "None") {
-                        if (tel[tmpstr].is<double>()) {con = 1; break;}
-                        if (tel[tmpstr].is<std::string>()) {con = 2; break;}
+                        if (tel(tmpstr).is<double>()) {con = 1; break;}
+                        if (tel(tmpstr).is<std::string>()) {con = 2; break;}
                     }
                 }
             }
@@ -681,12 +708,12 @@ class EvalVisitor: public Python3BaseVisitor {
             }
             if (con == 2) {
                 std::string tmp = visit(ctx->term(0));
-                if (tmp[0] != '"') tmp = std::string(tel[tmp].as<std::string>(), 1, tel[tmp].as<std::string>().length() - 2);
+                if (tmp[0] != '"') tmp = std::string(tel(tmp).as<std::string>(), 1, tel(tmp).as<std::string>().length() - 2);
                 else tmp = std::string(tmp, 1, tmp.length() - 2);
                 for (int i = 0;i < s.length();++ i) {
                     std::string tmpterm = visit(ctx->term(i + 1));
                     if (tmpterm[0] == '"') tmp = tmp + std::string(tmpterm, 1, tmpterm.length() - 2);
-                    else tmp = tmp + std::string(tel[tmpterm].as<std::string>(), 1, tel[tmpterm].as<std::string>().length() - 2);
+                    else tmp = tmp + std::string(tel(tmpterm).as<std::string>(), 1, tel(tmpterm).as<std::string>().length() - 2);
                 }
                 return '"' + tmp + '"';
             }
@@ -714,8 +741,8 @@ class EvalVisitor: public Python3BaseVisitor {
                     std::string tmpstr = tmp.as<std::string>();
                     if (tmpstr[0] == '"') {con = 2; I = i; break;}
                     else {
-                        if (tel[tmpstr].is<double>()) {con = 1; break;}
-                        if (tel[tmpstr].is<std::string>() && tel[tmpstr].as<std::string>() != "None") {con = 2; I = i; break;}
+                        if (tel(tmpstr).is<double>()) {con = 1; break;}
+                        if (tel(tmpstr).is<std::string>() && tel(tmpstr).as<std::string>() != "None") {con = 2; I = i; break;}
                     }
                 }
                 if (i < s.length() && s[i] == '/') {con = 1;break;}
@@ -752,7 +779,7 @@ class EvalVisitor: public Python3BaseVisitor {
             if (con == 2) {
                 std::string tmpstr = visit(ctx->factor(I)).as<std::string>();
                 if(tmpstr[0] == '"') tmpstr = std::string(tmpstr, 1, tmpstr.length()-2);
-                else tmpstr = std::string(tel[tmpstr].as<std::string>(), 1, tel[tmpstr].as<std::string>().length()-2);
+                else tmpstr = std::string(tel(tmpstr).as<std::string>(), 1, tel(tmpstr).as<std::string>().length()-2);
                 int tmpint;
                 if (I) {
                     tmpint = transint(visit(ctx->factor(0)));
@@ -808,7 +835,7 @@ class EvalVisitor: public Python3BaseVisitor {
             }
             if (tmp.is<std::string>()) {
                 std::string str = tmp.as<std::string>();
-                tmp = tel[str];
+                tmp = tel(str);
                 if (tmp.is<bigInteger>()) {
                     if (ctx->MINUS()) return (bigInteger)0 - tmp.as<bigInteger>();
                 }
@@ -979,8 +1006,8 @@ class EvalVisitor: public Python3BaseVisitor {
             if (tmp0.is<std::string>()) {
                 std::string tmpstr = tmp0.as<std::string>();
                 if (tmpstr[0] != '"') {
-                    if (tmpstr == "None") tel[tmp] = tmpstr;
-                    else tel[tmp] = tel[tmpstr];
+                    if (tmpstr == "None") chan(tmp, tmpstr);
+                    else tel(tmpstr);chan(tmp, tel(tmpstr));
                 }
             }
             return tmp;
