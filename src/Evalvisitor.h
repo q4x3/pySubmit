@@ -11,31 +11,6 @@
 
 std::map<std::string,antlrcpp::Any>tel;
 
-//将一个any转化成bool
-bool transbool(antlrcpp::Any tmp)
-{
-    bool tmpbl;
-    if (tmp.is<bool>()) tmpbl = tmp.as<bool>();
-    if (tmp.is<bigInteger>()) tmpbl = tmp.as<bigInteger>();
-    if (tmp.is<double>()) tmpbl = tmp.as<double>();
-    if (tmp.is<std::string>()) {
-        std::string str1 = tmp.as<std::string>();
-        if (str1 == "None") tmpbl = false;
-        if (str1[0] == '"') tmpbl = str1.length()-2;
-        if (str1[0] != '"') {
-            antlrcpp::Any tmp2 = tel[str1];
-            if (tmp2.is<bool>()) tmpbl = tmp2.as<bool>();
-            if (tmp2.is<bigInteger>()) tmpbl = tmp2.as<bigInteger>();
-            if (tmp2.is<double>()) tmpbl = tmp2.as<double>();
-            if (tmp2.is<std::string>()) {
-                if (str1 == "None") tmpbl = false;
-                if (str1[0] == '"') tmpbl = str1.length()-2;
-            }
-        }
-    }
-    return tmpbl;
-}
-
 //print函数
 void anyPrint(antlrcpp::Any tmp)
 {
@@ -90,6 +65,100 @@ void anyPrint(antlrcpp::Any tmp)
         if (bl) {std::cout << "True"; return;}
         else {std::cout << "False"; return;}
     }
+}
+
+//将一个any转化成bool
+bool transbool(antlrcpp::Any tmp)
+{
+    bool tmpbl;
+    if (tmp.is<bool>()) tmpbl = tmp.as<bool>();
+    if (tmp.is<bigInteger>()) tmpbl = tmp.as<bigInteger>();
+    if (tmp.is<double>()) tmpbl = tmp.as<double>();
+    if (tmp.is<std::string>()) {
+        std::string str1 = tmp.as<std::string>();
+        if (str1 == "None") tmpbl = false;
+        if (str1[0] == '"') tmpbl = str1.length()-2;
+        if (str1[0] != '"') {
+            antlrcpp::Any tmp2 = tel[str1];
+            if (tmp2.is<bool>()) tmpbl = tmp2.as<bool>();
+            if (tmp2.is<bigInteger>()) tmpbl = tmp2.as<bigInteger>();
+            if (tmp2.is<double>()) tmpbl = tmp2.as<double>();
+            if (tmp2.is<std::string>()) {
+                if (str1 == "None") tmpbl = false;
+                if (str1[0] == '"') tmpbl = str1.length()-2;
+            }
+        }
+    }
+    return tmpbl;
+}
+
+bigInteger transint(antlrcpp::Any tmp)
+{
+    bigInteger in;
+    if (tmp.is<bigInteger>()) in = tmp.as<bigInteger>();
+    if (tmp.is<bool>()) {
+        if (tmp.as<bool>()) in = 1;
+        else in = 0;
+    }
+    if (tmp.is<double>()) in = (int)tmp.as<double>();
+    if (tmp.is<std::string>()) {
+        std::string str = tmp.as<std::string>();
+        if (str == "None") in = 0;
+        else {
+            antlrcpp::Any tmp0 = tel[str];
+            if (tmp0.is<bigInteger>()) in = tmp0.as<bigInteger>();
+            if (tmp0.is<bool>()) {
+                if(tmp0.as<bool>()) in = 1;
+                else in = 0;
+            }
+            if (tmp0.is<double>()) in = (int)tmp0.as<double>();
+        }
+    }
+    return in;
+}
+
+double transflo(antlrcpp::Any tmp)
+{
+    double dou;
+    if (tmp.is<double>()) dou = tmp.as<double>();
+    if (tmp.is<bigInteger>()) dou = (double)tmp.as<bigInteger>();
+    if (tmp.is<bool>()) dou = (double)tmp.as<bool>();
+    if (tmp.is<std::string>()) {
+        std::string str = tmp.as<std::string>();
+        if (str == "None") dou = 0;
+        else {
+            antlrcpp::Any tmp0 = tel[str];
+            if (tmp0.is<double>()) dou = tmp0.as<double>();
+            if (tmp0.is<bigInteger>()) dou = (double)tmp0.as<bigInteger>();
+            if (tmp0.is<bool>()) dou = (double)tmp0.as<bool>();
+        }
+    }
+    return dou;
+}
+
+std::string transstr(antlrcpp::Any tmp)
+{
+    std::string str;
+    if (tmp.is<std::string>()) {
+        str = tmp.as<std::string>();
+        if (str[0] != '"') {
+            antlrcpp::Any tmp0 = tel[str];
+            if (tmp0.is<std::string>()) str = tmp0.as<std::string>();
+            if (tmp0.is<bigInteger>()) str = '"' + (std::string)tmp0.as<bigInteger>() + '"';
+            if (tmp0.is<double>()) str = '"' + std::to_string(tmp0.as<double>()) + '"';
+            if (tmp0.is<bool>()) {
+                if (tmp0.as<bool>()) str = '"' + "True" + '"';
+                else str = '"' + "False" + '"';
+            }
+        }
+    }
+    if (tmp.is<bigInteger>()) str = '"' + (std::string)tmp.as<bigInteger>() + '"';
+    if (tmp.is<double>()) str = '"' + std::to_string(tmp.as<double>()) + '"';
+    if (tmp.is<bool>()) {
+        if (tmp.as<bool>()) str = '"' + "True" + '"';
+        else str = '"' + "False" + '"';
+    }
+    return str;
 }
 
 class EvalVisitor: public Python3BaseVisitor {
@@ -564,7 +633,7 @@ class EvalVisitor: public Python3BaseVisitor {
     }
 
     antlrcpp::Any visitArith_expr(Python3Parser::Arith_exprContext *ctx) override {
-        std::string s = std::string(1000,'0');
+        std::string s = std::string(10000,'0');
         if (ctx->term().size() > 1) {
             for (int i = 0;i < ctx->ADD().size();++ i)
                 s[ctx->ADD(i)->getSymbol()->getTokenIndex()] = '+';
@@ -578,7 +647,7 @@ class EvalVisitor: public Python3BaseVisitor {
                 if (tmp.is<std::string>()) {
                     std::string tmpstr = tmp.as<std::string>();
                     if (tmpstr[0] == '"') {con = 2; break;}
-                    else {
+                    if (tmpstr[0] != '"' && tmpstr != "None") {
                         if (tel[tmpstr].is<double>()) {con = 1; break;}
                         if (tel[tmpstr].is<std::string>()) {con = 2; break;}
                     }
@@ -587,13 +656,11 @@ class EvalVisitor: public Python3BaseVisitor {
             if (con == 0) {
                 antlrcpp::Any tmp = visit(ctx->term(0));
                 bigInteger tmpint;
-                if (tmp.is<bigInteger>()) tmpint = tmp.as<bigInteger>();
-                else tmpint = tel[tmp.as<std::string>()].as<bigInteger>();
+                tmpint = transint(tmp);
                 for (int i = 0;i < s.length();++ i) {
                     antlrcpp::Any tmpterm = visit(ctx->term(i + 1));
                     bigInteger tmpin;
-                    if (tmpterm.is<bigInteger>()) tmpin = tmpterm.as<bigInteger>();
-                    else tmpin = tel[tmpterm.as<std::string>()].as<bigInteger>();
+                    tmpin = transint(tmpterm);
                     if (s[i] == '+') tmpint = tmpint + tmpin;
                     if (s[i] == '-') tmpint = tmpint - tmpin;
                 }
@@ -602,21 +669,13 @@ class EvalVisitor: public Python3BaseVisitor {
             if (con == 1) {
                 antlrcpp::Any tmp = visit(ctx->term(0));
                 double tmpdou;
-                if (tmp.is<double>()) tmpdou = tmp.as<double>();
-                if (tmp.is<bigInteger>()) tmpdou = tmp.as<bigInteger>();
-                if (tmp.is<std::string>()) tmpdou = tel[tmp.as<std::string>()].as<double>();
+                tmpdou = transflo(tmp);
                 for (int i = 0;i < s.length();++ i) {
                     antlrcpp::Any tmpterm = visit(ctx->term(i + 1));
                     double tmpdo;
-                    if (tmpterm.is<double>()) tmpdo = tmpterm.as<double>();
-                    if (tmpterm.is<bigInteger>()) tmpdo = tmpterm.as<bigInteger>();
-                    if (tmpterm.is<std::string>()) {
-                        if (tel[tmpterm.as<std::string>()].is<double>())
-                            tmpdo = tel[tmpterm.as<std::string>()].as<double>();
-                        else tmpdo = tel[tmpterm.as<std::string>()].as<bigInteger>();
-                    }
+                    tmpdo = transflo(tmpterm);
                     if (s[i] == '+') tmpdou += tmpdo;
-                    if (s[i] == '-') tmpdou += tmpdo;
+                    if (s[i] == '-') tmpdou -= tmpdo;
                 }
                 return tmpdou;
             }
@@ -636,7 +695,7 @@ class EvalVisitor: public Python3BaseVisitor {
     }
 
     antlrcpp::Any visitTerm(Python3Parser::TermContext *ctx) override {
-        std::string s = std::string(1000,'0');
+        std::string s = std::string(10000,'0');
         if (ctx->factor().size() > 1) {
             for (int i = 0;i < ctx->STAR().size();++ i)
                 s[ctx->STAR(i)->getSymbol()->getTokenIndex()] = '*';
@@ -656,7 +715,7 @@ class EvalVisitor: public Python3BaseVisitor {
                     if (tmpstr[0] == '"') {con = 2; I = i; break;}
                     else {
                         if (tel[tmpstr].is<double>()) {con = 1; break;}
-                        if (tel[tmpstr].is<std::string>()) {con = 2; I = i; break;}
+                        if (tel[tmpstr].is<std::string>() && tel[tmpstr].as<std::string>() != "None") {con = 2; I = i; break;}
                     }
                 }
                 if (i < s.length() && s[i] == '/') {con = 1;break;}
@@ -664,13 +723,11 @@ class EvalVisitor: public Python3BaseVisitor {
             if (con == 0) {
                 antlrcpp::Any tmp = visit(ctx->factor(0));
                 bigInteger tmpint;
-                if (tmp.is<bigInteger>()) tmpint = tmp.as<bigInteger>();
-                else tmpint = tel[tmp.as<std::string>()].as<bigInteger>();
+                tmpint = transint(tmp);
                 for (int i = 0;i < s.length();++ i) {
                     antlrcpp::Any tmpfac = visit(ctx->factor(i + 1));
                     bigInteger tmpin;
-                    if (tmpfac.is<bigInteger>()) tmpin = tmpfac.as<bigInteger>();
-                    else tmpin = tel[tmpfac.as<std::string>()].as<bigInteger>();
+                    tmpin = transint(tmpfac);
                     if (s[i] == '*') tmpint = tmpint * tmpin;
                     if (s[i] == '$') tmpint = tmpint / tmpin;
                     if (s[i] == '%') tmpint = tmpint % tmpin;
@@ -680,19 +737,11 @@ class EvalVisitor: public Python3BaseVisitor {
             if (con == 1) {
                 antlrcpp::Any tmp = visit(ctx->factor(0));
                 double tmpdou;
-                if (tmp.is<double>()) tmpdou = tmp.as<double>();
-                if (tmp.is<bigInteger>()) tmpdou = tmp.as<bigInteger>();
-                if (tmp.is<std::string>()) tmpdou = tel[tmp.as<std::string>()].as<double>();
+                tmpdou = transflo(tmp);
                 for (int i = 0;i < s.length();++ i) {
                     antlrcpp::Any tmpfac = visit(ctx->factor(i + 1));
                     double tmpdo;
-                    if (tmpfac.is<double>()) tmpdo = tmpfac.as<double>();
-                    if (tmpfac.is<bigInteger>()) tmpdo = tmpfac.as<bigInteger>();
-                    if (tmpfac.is<std::string>()) {
-                        if (tel[tmpfac.as<std::string>()].is<double>())
-                            tmpdo = tel[tmpfac.as<std::string>()].as<double>();
-                        else tmpdo = tel[tmpfac.as<std::string>()].as<bigInteger>();
-                    }
+                    tmpdo = transflo(tmpfac);
                     if (s[i] == '*') tmpdou *= tmpdo;
                     if (s[i] == '/') tmpdou /= tmpdo;
                     if (s[i] == '$') tmpdou = (long long int)tmpdou / (long long int)tmpdo;
@@ -706,28 +755,24 @@ class EvalVisitor: public Python3BaseVisitor {
                 else tmpstr = std::string(tel[tmpstr].as<std::string>(), 1, tel[tmpstr].as<std::string>().length()-2);
                 int tmpint;
                 if (I) {
-                    if (visit(ctx->factor(0)).is<bigInteger>()) tmpint = visit(ctx->factor(0)).as<bigInteger>();
-                    else tmpint = tel[visit(ctx->factor(0)).as<std::string>()].as<bigInteger>();
+                    tmpint = transint(visit(ctx->factor(0)));
                     for (int i = 0;i < s.length();++ i) {
                         if (i == I-1) continue;
                         int tmpin;
                         antlrcpp::Any tmpfac = visit(ctx->factor(i + 1));
-                        if (tmpfac.is<bigInteger>()) tmpin = tmpfac.as<bigInteger>();
-                        else tmpin = tel[tmpfac.as<std::string>()].as<bigInteger>();
+                        tmpin = transint(tmpfac);
                         if (s[i] == '*') tmpint = tmpint * tmpin;
                         if (s[i] == '$') tmpint = tmpint / tmpin;
                         if (s[i] == '%') tmpint = tmpint % tmpin;
                     }
                 }
                 else {
-                    if (visit(ctx->factor(1)).is<bigInteger>()) tmpint = visit(ctx->factor(1)).as<bigInteger>();
-                    else tmpint = tel[visit(ctx->factor(1)).as<std::string>()].as<bigInteger>();
+                    tmpint = transint(visit(ctx->factor(1)));
                     for (int i = 1;i < s.length();++ i) {
                         if (i == I-1) continue;
                         int tmpin;
                         antlrcpp::Any tmpfac = visit(ctx->factor(i + 1));
-                        if (tmpfac.is<bigInteger>()) tmpin = tmpfac.as<bigInteger>();
-                        else tmpin = tel[tmpfac.as<std::string>()].as<bigInteger>();
+                        tmpin = transint(tmpfac);
                         if (s[i] == '*') tmpint = tmpint * tmpin;
                         if (s[i] == '$') tmpint = tmpint / tmpin;
                         if (s[i] == '%') tmpint = tmpint % tmpin;
@@ -745,12 +790,6 @@ class EvalVisitor: public Python3BaseVisitor {
     antlrcpp::Any visitFactor(Python3Parser::FactorContext *ctx) override {
         if (ctx->atom_expr()) {
             antlrcpp::Any tmp = visit(ctx->atom_expr());
-            if (tmp.is<bigInteger>()) {
-                if (ctx->MINUS()) return (bigInteger)0 - tmp.as<bigInteger>();
-            }
-            if (tmp.is<double>()) {
-                if (ctx->MINUS()) return 0 - tmp.as<double>();
-            }
             return tmp;
         }
         if (ctx->factor()) {
@@ -760,6 +799,28 @@ class EvalVisitor: public Python3BaseVisitor {
             }
             if (tmp.is<double>()) {
                 if (ctx->MINUS()) return 0 - tmp.as<double>();
+            }
+            if (tmp.is<bool>()) {
+                if (ctx->MINUS()) {
+                    if (tmp.as<bool>()) return (bigInteger)(-1);
+                    else return (bigInteger)0;
+                }
+            }
+            if (tmp.is<std::string>()) {
+                std::string str = tmp.as<std::string>();
+                tmp = tel[str];
+                if (tmp.is<bigInteger>()) {
+                    if (ctx->MINUS()) return (bigInteger)0 - tmp.as<bigInteger>();
+                }
+                if (tmp.is<double>()) {
+                    if (ctx->MINUS()) return 0 - tmp.as<double>();
+                }
+                if (tmp.is<bool>()) {
+                    if (ctx->MINUS()) {
+                        if (tmp.as<bool>()) return (bigInteger)(-1);
+                         else return (bigInteger)0;
+                    }
+                }
             }
             return tmp;
         }
@@ -782,6 +843,19 @@ class EvalVisitor: public Python3BaseVisitor {
                     else std::cout << std::endl;
                 }
             }
+            if (str1 == "int")  {
+                bigInteger a = transint(tmp2[0]);
+                return a;
+            }
+            if (str1 == "float") {
+                double a = transflo(tmp2[0]);
+                return a;
+            }
+            if (str1 == "str") {
+                std::string a = transstr(tmp2[0]);
+                return a;
+            }
+            if (str1 == "bool") return transbool(tmp2[0]);
             return 0;
         } else {
             tmp1 = visit(ctx->atom());
