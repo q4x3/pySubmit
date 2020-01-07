@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <iomanip>
 #include <vector>
+#include <stdlib.h>
+#include <stdio.h>
 
 
 std::vector<std::map<std::string,antlrcpp::Any>>var;
@@ -126,6 +128,17 @@ bigInteger transint(antlrcpp::Any tmp)
     if (tmp.is<std::string>()) {
         std::string str = tmp.as<std::string>();
         if (str == "None") in = 0;
+        else if (str[0] == '"') {
+            str = std::string(str, 1, str.length()-2);
+            if (str[0] == '-') {
+                str = std::string(str, 1, str.length()-1);
+                in = bigInteger(str, str.length(), -1);
+            } else if (str[0] == '0') {
+                in = bigInteger(str, 1, 0);
+            } else {
+                in = bigInteger(str, str.length(), 1);
+            }
+        }
         else {
             antlrcpp::Any tmp0 = tel(str);
             if (tmp0.is<bigInteger>()) in = tmp0.as<bigInteger>();
@@ -134,6 +147,21 @@ bigInteger transint(antlrcpp::Any tmp)
                 else in = 0;
             }
             if (tmp0.is<double>()) in = (int)tmp0.as<double>();
+            if (tmp0.is<std::string>()) {
+                std::string str0 = tmp0.as<std::string>();
+                if (str0 == "None") in = 0;
+                else if(str0[0] == '"') {
+                    str0 = std::string(str0, 1, str0.length()-2);
+                    if (str0[0] == '-') {
+                        str0 = std::string(str0, 1, str0.length()-1);
+                        in = bigInteger(str0, str0.length(), -1);
+                    } else if (str0[0] == '0') {
+                        in = bigInteger(str0, 1, 0);
+                    } else {
+                        in = bigInteger(str0, str0.length(), 1);
+                    }
+                }
+            }
         }
     }
     return in;
@@ -148,6 +176,10 @@ double transflo(antlrcpp::Any tmp)
     if (tmp.is<std::string>()) {
         std::string str = tmp.as<std::string>();
         if (str == "None") dou = 0;
+        else if (str[0] == '"') {
+            str = std::string(str, 1, str.length()-2);
+            dou = std::atof(str.c_str());
+        }
         else {
             antlrcpp::Any tmp0 = tel(str);
             if (tmp0.is<double>()) dou = tmp0.as<double>();
@@ -216,17 +248,22 @@ class EvalVisitor: public Python3BaseVisitor {
 
     antlrcpp::Any visitStmt(Python3Parser::StmtContext *ctx) override {
         //std::cout << "stmt" << std::endl;
-        return visitChildren(ctx);
+        if (ctx->compound_stmt()) return visit(ctx->compound_stmt());
+        if (ctx->simple_stmt()) return visit(ctx->simple_stmt());
     }
 
     antlrcpp::Any visitSimple_stmt(Python3Parser::Simple_stmtContext *ctx) override {
         //std::cout << "simplestmt" << std::endl;
-        return visitChildren(ctx);
+        return visit(ctx->small_stmt());
     }
 
     antlrcpp::Any visitSmall_stmt(Python3Parser::Small_stmtContext *ctx) override {
         //std::cout << "smallstmt" << std::endl;
-        return visitChildren(ctx);
+        if (ctx->expr_stmt()) return visit(ctx->expr_stmt());
+        if (ctx->flow_stmt()) {
+            antlrcpp::Any tmp = visit(ctx->flow_stmt());
+            return tmp;
+        }
     }
 
     antlrcpp::Any visitExpr_stmt(Python3Parser::Expr_stmtContext *ctx) override {
@@ -438,7 +475,9 @@ class EvalVisitor: public Python3BaseVisitor {
 
     antlrcpp::Any visitFlow_stmt(Python3Parser::Flow_stmtContext *ctx) override {
         //std::cout << "flowstmt" << std::endl;
-        return visitChildren(ctx);
+        if (ctx->break_stmt()) return std::string("break");
+        if (ctx->continue_stmt()) return std::string("continue");
+        if (ctx->return_stmt()) return visit(ctx->return_stmt());
     }
 
     antlrcpp::Any visitBreak_stmt(Python3Parser::Break_stmtContext *ctx) override {
@@ -458,8 +497,8 @@ class EvalVisitor: public Python3BaseVisitor {
 
     antlrcpp::Any visitCompound_stmt(Python3Parser::Compound_stmtContext *ctx) override {
         if (ctx->if_stmt()) return visit(ctx->if_stmt());
-        //if (ctx->while_stmt()) return visit(ctx->while());
-        return visitChildren(ctx);
+        if (ctx->while_stmt()) return visit(ctx->while_stmt());
+        return 0;
     }
 
     antlrcpp::Any visitIf_stmt(Python3Parser::If_stmtContext *ctx) override {
@@ -467,10 +506,17 @@ class EvalVisitor: public Python3BaseVisitor {
         bool cnt = 0;
         for (int i = 0;i < siz;++ i) {
             antlrcpp::Any tmp = visit(ctx->test(i));
-            if (transbool(tmp)) {visit(ctx->suite(i)); cnt = 1; break;}
+            if (transbool(tmp)) {
+                antlrcpp::Any tmp1 = visit(ctx->suite(i));
+                if (tmp1.is<std::string>() && tmp1.as<std::string>() == "break") return tmp1;
+                cnt = 1; 
+                break;
+            }
         }
         if (cnt == 0 && ctx->suite().size() > siz) {
-            visit(ctx->suite(siz));
+            antlrcpp::Any tmp1 = visit(ctx->suite(siz));
+            if (tmp1.is<std::string>() && tmp1.as<std::string>() == "break") return tmp1;
+            if (tmp1.is<std::string>() && tmp1.as<std::string>() == "continue") return tmp1;
         }
         return 0;
     }
@@ -480,20 +526,30 @@ class EvalVisitor: public Python3BaseVisitor {
         antlrcpp::Any tmp = visit(ctx->test());
         bool bl = transbool(tmp);
         while(bl) {
-            visit(ctx->suite());
+            antlrcpp::Any tmp1 = visit(ctx->suite());
             tmp = visit(ctx->test());
             bl = transbool(tmp);
+            if (tmp1.is<std::string>() && tmp1.as<std::string>() == "break") break;
         }
         return 0;
     }
 
     antlrcpp::Any visitSuite(Python3Parser::SuiteContext *ctx) override {
         //std::cout << "suite" << std::endl;
+        antlrcpp::Any tmp;
         int s = ctx->stmt().size();
         if (s > 0)
-            for (int i = 0;i < s;++ i) visit(ctx->stmt(i));
-        if (ctx->simple_stmt()) visit(ctx->simple_stmt());
-        return 0;
+            for (int i = 0;i < s;++ i) {
+                tmp = visit(ctx->stmt(i));
+                if (tmp.is<std::string>() && tmp.as<std::string>() == "break") return tmp;
+                if (tmp.is<std::string>() && tmp.as<std::string>() == "continue") return tmp;
+            }
+        if (ctx->simple_stmt()) {
+            tmp = visit(ctx->simple_stmt());
+            if (tmp.is<std::string>() && tmp.as<std::string>() == "break") return tmp;
+            if (tmp.is<std::string>() && tmp.as<std::string>() == "continue") return tmp;
+        }
+        return tmp;
         //return visitChildren(ctx);
     }
 
