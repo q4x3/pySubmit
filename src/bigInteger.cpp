@@ -88,6 +88,7 @@ bigInteger &bigInteger::operator=(const long long int &right)
 {
     s = std::to_string(right);
     if (s[0] == '-') s = std::string(s, 1, s.length() - 1);
+    reverse(s.begin(),s.end());
     L = s.length();
     if (right > 0) sig = 1;
     if (right == 0) sig = 0;
@@ -99,6 +100,7 @@ bigInteger &bigInteger::operator=(const int &right)
 {
     s = std::to_string(right);
     if (s[0] == '-') s = std::string(s, 1, s.length() - 1);
+    reverse(s.begin(),s.end());
     L = s.length();
     if (right > 0) sig = 1;
     if (right == 0) sig = 0;

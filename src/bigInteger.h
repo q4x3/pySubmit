@@ -18,6 +18,7 @@ public:
     bigInteger(long long int tmp) {
         s = std::to_string(tmp);
         if (s[0] == '-') s = std::string(s, 1, s.length() - 1);
+        reverse(s.begin(),s.end());
         L = s.length();
         if (tmp > 0) sig = 1;
         if (tmp == 0) sig = 0;
@@ -26,6 +27,7 @@ public:
     bigInteger(int tmp) {
         s = std::to_string(tmp);
         if (s[0] == '-') s = std::string(s, 1, s.length() - 1);
+        reverse(s.begin(),s.end());
         L = s.length();
         if (tmp > 0) sig = 1;
         if (tmp == 0) sig = 0;
