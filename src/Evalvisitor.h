@@ -13,19 +13,24 @@
 
 
 std::vector<std::map<std::string,antlrcpp::Any>>var;
-std::map<std::string, Python3Parser::ParametersContext*>par;
-std::map<std::string, Python3Parser::SuiteContext*>sui;
 
 //返回以str为名的any
 antlrcpp::Any tel(std::string str)
 {
-    if (var[var.size()-1].count(str)) return var[var.size()-1][str];
-    if (var[0].count(str)) return var[0][str];
+    for (int i = 0;i < var.size();++ i) {
+        if (var[i].count(str)) return var[i][str];
+    }
 }
 
 //修改以str为名的any的值
 void chan(std::string str, antlrcpp::Any a)
 {
+    for (int i = 0;i < var.size();++ i) {
+        if (var[i].count(str)) {
+            var[i][str] = a;
+            return;
+        }
+    }
     var[var.size()-1][str] = a;
     return;
 }
@@ -40,18 +45,17 @@ void anyPrint(antlrcpp::Any tmp)
             std::cout << std::string(str2,1,str2.length()-2);
             return;
         }
-        if (str2 == std::string("None")) {
+        if (str2 == "None") {
             std::cout << "None";
             return;
         }
         else {
             if (tel(str2).is<std::string>()) {
-                std::cout << str2 << std::endl;
                 if (tel(str2).as<std::string>()[0] == '"') {
                     std::cout << std::string(tel(str2).as<std::string>(),1,tel(str2).as<std::string>().length()-2);
                     return;
                 }
-                if (tel(str2).as<std::string>() == std::string("None")) {
+                if (tel(str2).as<std::string>() == "None") {
                     std::cout << "None";
                     return;
                 }
@@ -120,9 +124,7 @@ bigInteger transint(antlrcpp::Any tmp)
         if (tmp.as<bool>()) in = 1;
         else in = 0;
     }
-    if (tmp.is<double>()) {
-        in = (int)tmp.as<double>();
-    }
+    if (tmp.is<double>()) in = (int)tmp.as<double>();
     if (tmp.is<std::string>()) {
         std::string str = tmp.as<std::string>();
         if (str == "None") in = 0;
@@ -226,34 +228,17 @@ class EvalVisitor: public Python3BaseVisitor {
 
     antlrcpp::Any visitFuncdef(Python3Parser::FuncdefContext *ctx) override {
         //std::cout << "funcdef" << std::endl;
-        std::string str = ctx->NAME()->toString();
-        par[str] = ctx->parameters();
-        sui[str] = ctx->suite();
-        return 0;
+        return visitChildren(ctx);
     }
 
     antlrcpp::Any visitParameters(Python3Parser::ParametersContext *ctx) override {
         //std::cout << "parameters" << std::endl;
-        if (ctx->typedargslist()) return visit(ctx->typedargslist());
-        vector<antlrcpp::Any>vec;
-        return vec;
+        return visitChildren(ctx);
     }
 
     antlrcpp::Any visitTypedargslist(Python3Parser::TypedargslistContext *ctx) override {
-        vector<antlrcpp::Any>vec;
-        int siz1 = ctx->tfpdef().size(), siz2 = ctx->test().size();
-        for (int i = 0;i < siz1-siz2;++ i) {
-            std::string str = ctx->tfpdef(i)->NAME()->toString();
-            chan(str, (int)0);
-            vec.push_back(str);
-        }
-        for (int i = siz1-siz2;i < siz1;++ i) {
-            std::string str = ctx->tfpdef(i)->toString();
-            antlrcpp::Any tmp = visit(ctx->test(i));
-            chan(str, tmp);
-            vec.push_back(str);
-        }
-        return vec;
+        //std::cout << "typedargslist" << std::endl;
+        return visitChildren(ctx);
     }
 
     antlrcpp::Any visitTfpdef(Python3Parser::TfpdefContext *ctx) override {
@@ -507,18 +492,13 @@ class EvalVisitor: public Python3BaseVisitor {
     }
 
     antlrcpp::Any visitReturn_stmt(Python3Parser::Return_stmtContext *ctx) override {
-        vector<antlrcpp::Any>vec;
-        if (ctx->testlist()) {
-            vec = visit(ctx->testlist()).as<vector<antlrcpp::Any>>();
-            return vec;
-        }
-        return 0;
+        //std::cout << "returnstmt" << std::endl;
+        return visitChildren(ctx);
     }
 
     antlrcpp::Any visitCompound_stmt(Python3Parser::Compound_stmtContext *ctx) override {
         if (ctx->if_stmt()) return visit(ctx->if_stmt());
         if (ctx->while_stmt()) return visit(ctx->while_stmt());
-        if (ctx->funcdef()) visit(ctx->funcdef());
         return 0;
     }
 
@@ -531,7 +511,6 @@ class EvalVisitor: public Python3BaseVisitor {
                 antlrcpp::Any tmp1 = visit(ctx->suite(i));
                 if (tmp1.is<std::string>() && tmp1.as<std::string>() == "break") return tmp1;
                 if (tmp1.is<std::string>() && tmp1.as<std::string>() == "continue") return tmp1;
-                if (tmp1.is<vector<antlrcpp::Any>>()) return tmp1;
                 cnt = 1; 
                 break;
             }
@@ -540,7 +519,6 @@ class EvalVisitor: public Python3BaseVisitor {
             antlrcpp::Any tmp1 = visit(ctx->suite(siz));
             if (tmp1.is<std::string>() && tmp1.as<std::string>() == "break") return tmp1;
             if (tmp1.is<std::string>() && tmp1.as<std::string>() == "continue") return tmp1;
-            if (tmp1.is<vector<antlrcpp::Any>>()) return tmp1;
         }
         return 0;
     }
@@ -554,7 +532,6 @@ class EvalVisitor: public Python3BaseVisitor {
             tmp = visit(ctx->test());
             bl = transbool(tmp);
             if (tmp1.is<std::string>() && tmp1.as<std::string>() == "break") break;
-            //if (tmp1.is<vector<antlrcpp::Any>>()) return tmp1;
         }
         return 0;
     }
@@ -566,16 +543,13 @@ class EvalVisitor: public Python3BaseVisitor {
         if (s > 0)
             for (int i = 0;i < s;++ i) {
                 tmp = visit(ctx->stmt(i));
-                if (tmp.is<std::string>() && tmp.as<std::string>() == std::string("break")) return tmp;
-                if (tmp.is<std::string>() && tmp.as<std::string>() == std::string("continue")) return tmp;
-                if (tmp.is<vector<antlrcpp::Any>>()) return tmp;
+                if (tmp.is<std::string>() && tmp.as<std::string>() == "break") return tmp;
+                if (tmp.is<std::string>() && tmp.as<std::string>() == "continue") return tmp;
             }
         if (ctx->simple_stmt()) {
             tmp = visit(ctx->simple_stmt());
-            if (tmp.is<std::string>() && tmp.as<std::string>() == std::string("break")) return tmp;
-            if (tmp.is<std::string>() && tmp.as<std::string>() == std::string("continue")) return tmp;
-            antlrcpp::Any tmp = visit(ctx->simple_stmt()->small_stmt()->flow_stmt()->return_stmt());
-            if (tmp.is<vector<antlrcpp::Any>>()) return tmp;
+            if (tmp.is<std::string>() && tmp.as<std::string>() == "break") return tmp;
+            if (tmp.is<std::string>() && tmp.as<std::string>() == "continue") return tmp;
         }
         return tmp;
         //return visitChildren(ctx);
@@ -993,7 +967,6 @@ class EvalVisitor: public Python3BaseVisitor {
                     if (i < tmp2.size()-1) std::cout << " ";
                     else std::cout << std::endl;
                 }
-                return 0;
             }
             if (str1 == "int")  {
                 bigInteger a = transint(tmp2[0]);
@@ -1008,30 +981,24 @@ class EvalVisitor: public Python3BaseVisitor {
                 return a;
             }
             if (str1 == "bool") return transbool(tmp2[0]);
-
-
-            std::map<std::string,antlrcpp::Any>ma;
-            var.push_back(ma);
-            vector<antlrcpp::Any>lis = visitParameters(par[str1]);
-            vector<antlrcpp::Any>tra = visit(ctx->trailer());
-            for (int i = 0;i < tra.size();++ i) {
-                if (tra[i].is<std::string>()&&tra[i].as<std::string>()!="None") continue;
-                chan(lis[i].as<std::string>(), tra[i]);
-            }
-            antlrcpp::Any tmp = visit(sui[str1]);
-            vector<antlrcpp::Any>tp;
-            if (tmp.is<vector<antlrcpp::Any>>()) {
-                tp = tmp.as<vector<antlrcpp::Any>>();
-                var.pop_back();
-                return tp;
-            } else {
-                var.pop_back();
-                return 0;
-            }
-            
+            return 0;
         } else {
             tmp1 = visit(ctx->atom());
-            return tmp1;
+            if (tmp1.is<std::string>()) {
+                std::string str;
+                str = tmp1.as<std::string>();
+                return str;
+            }
+            if (tmp1.is<bigInteger>()) {
+                bigInteger tmpin = tmp1.as<bigInteger>();
+                return tmpin;
+            }
+            if (tmp1.is<double>())
+                return tmp1.as<double>();
+            if (tmp1.is<bool>()) {
+                bool bl = tmp1.as<bool>();
+                return bl;
+            }
         }
     }
 
@@ -1138,18 +1105,12 @@ class EvalVisitor: public Python3BaseVisitor {
                 std::string tmpstr = tmp0.as<std::string>();
                 if (tmpstr[0] != '"') {
                     if (tmpstr == "None") chan(tmp, tmpstr);
-                    else chan(tmp, tel(tmpstr));
+                    else tel(tmpstr);chan(tmp, tel(tmpstr));
                 }
             }
             return tmp;
         }
-        else {
-            antlrcpp::Any tmp = visit(ctx->test());
-            if (tmp.is<std::string>() && tmp.as<std::string>()[0] != '"' && tmp.as<std::string>() != "None") {
-                tmp = tel(tmp.as<std::string>());
-            }
-            return tmp;
-        }
+        else return visit(ctx->test());
     }
 };
 
