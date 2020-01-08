@@ -653,6 +653,10 @@ class EvalVisitor: public Python3BaseVisitor {
                     lsig = 2;
                     lhsint = lhs.as<bigInteger>();
                 }
+                if (lhs.is<double>()) {
+                    lsig = 4;
+                    lhsdou = lhs.as<double>();
+                }
                 
                 if (rhs.is<std::string>()) {
                     rhsstr = rhs.as<std::string>();
@@ -676,7 +680,12 @@ class EvalVisitor: public Python3BaseVisitor {
                     rsig = 2;
                     rhsint = rhs.as<bigInteger>();
                 }
+                if (rhs.is<double>()) {
+                    rsig = 4;
+                    rhsdou = rhs.as<double>();
+                }
                 if (lsig == 2 || lsig == 3) {
+                    if (rsig == 2 || rsig == 3) {
                     if (s[i] == '1')
                         if (lhsint > rhsint || lhsint == rhsint) {bl = 0; break;}
                     if (s[i] == '2')
@@ -689,6 +698,21 @@ class EvalVisitor: public Python3BaseVisitor {
                         if (lhsint > rhsint) {bl = 0; break;}
                     if (s[i] == '6')
                         if (lhsint == rhsint) {bl = 0; break;}
+                    }
+                    if (rsig == 4 || rsig == 5) {
+                    if (s[i] == '1')
+                        if ((double)lhsint > rhsdou || (double)lhsint == rhsdou) {bl = 0; break;}
+                    if (s[i] == '2')
+                        if ((double)lhsint < rhsdou || (double)lhsint == rhsdou) {bl = 0; break;}
+                    if (s[i] == '3')
+                        if ((double)lhsint != rhsdou) {bl = 0; break;}
+                    if (s[i] == '4')
+                        if ((double)lhsint < rhsdou) {bl = 0; break;}
+                    if (s[i] == '5')
+                        if ((double)lhsint > rhsdou) {bl = 0; break;}
+                    if (s[i] == '6')
+                        if ((double)lhsint == rhsdou) {bl = 0; break;}
+                    }
                 }
                 if (lsig == 0 || lsig == 1) {
                     if (s[i] == '1')
@@ -705,6 +729,7 @@ class EvalVisitor: public Python3BaseVisitor {
                         if (lhsstr == rhsstr) {bl = 0; break;}
                 }
                 if (lsig == 4 || lsig == 5) {
+                    if (rsig == 4 || rsig == 5) {
                     if (s[i] == '1')
                         if (lhsdou > rhsdou || lhsdou == rhsdou) {bl = 0; break;}
                     if (s[i] == '2')
@@ -717,6 +742,21 @@ class EvalVisitor: public Python3BaseVisitor {
                         if (lhsdou > rhsdou) {bl = 0; break;}
                     if (s[i] == '6')
                         if (lhsdou == rhsdou) {bl = 0; break;}
+                    }
+                    if (rsig == 2 || rsig == 3) {
+                    if (s[i] == '1')
+                        if (lhsdou > (double)rhsint || lhsdou == (double)rhsint) {bl = 0; break;}
+                    if (s[i] == '2')
+                        if (lhsdou < (double)rhsint || lhsdou == (double)rhsint) {bl = 0; break;}
+                    if (s[i] == '3')
+                        if (lhsdou != (double)rhsint) {bl = 0; break;}
+                    if (s[i] == '4')
+                        if (lhsdou < (double)rhsint) {bl = 0; break;}
+                    if (s[i] == '5')
+                        if (lhsdou > (double)rhsint) {bl = 0; break;}
+                    if (s[i] == '6')
+                        if (lhsdou == (double)rhsint) {bl = 0; break;}
+                    }
                 }
             }
             return bl;
